@@ -336,7 +336,7 @@ public class BridgeService extends Service {
         info.put("model",Build.MODEL);
         info.put("android",Build.VERSION.RELEASE);
         info.put("sdk",Build.VERSION.SDK_INT);
-        info.put("app_version",BuildConfig.VERSION_NAME);
+        info.put("app_version",BridgeConfig.APP_VERSION);
         info.put("cpu_lock",wakeLock!=null&&wakeLock.isHeld());
         info.put("wifi_lock",wifiLock!=null&&wifiLock.isHeld());
         info.put("consecutive_errors",consecutiveErrors);
