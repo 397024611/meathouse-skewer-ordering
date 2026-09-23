@@ -1,1 +1,18 @@
-{"name":"meathouse-skewer-ordering","version":"1.0.0","private":true,"scripts":{"dev":"next dev","build":"next build","start":"next start"},"dependencies":{"@supabase/supabase-js":"2.57.4","next":"15.5.18","qrcode":"1.5.4","react":"19.1.0","react-dom":"19.1.0"}}
+{
+  "name": "meathouse-skewer-ordering",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.57.4",
+    "next": "15.5.18",
+    "qrcode": "1.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "stripe": "22.6.2"
+  }
+}
