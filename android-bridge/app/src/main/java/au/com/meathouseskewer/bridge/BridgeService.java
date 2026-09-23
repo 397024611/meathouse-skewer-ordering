@@ -214,11 +214,6 @@ public class BridgeService extends Service {
             consecutiveErrors=0;
             recordPoll(true);
 
-            if(jobs.length()==0){
-                setStatus(heartbeatHealthy?"Heartbeat OK · waiting for orders":"Server online · heartbeat retrying");
-                return IDLE_POLL_MS;
-            }
-
             boolean anyPending=false;
             for(int i=0;i<jobs.length();i++){
                 JSONObject job=jobs.getJSONObject(i);
@@ -239,7 +234,21 @@ public class BridgeService extends Service {
                     clearLocalPrinted(jid,2);
                 }
             }
-            return anyPending?ACTIVE_POLL_MS:IDLE_POLL_MS;
+
+            boolean alaPending=false;
+            if(BuildConfig.ALA_API_KEY!=null&&!BuildConfig.ALA_API_KEY.isBlank()){
+                try{
+                    alaPending=processAlaCarteJobs(ip1,ip2,port);
+                    prefs.edit().putLong("ala_last_ok",System.currentTimeMillis()).remove("ala_error").apply();
+                }catch(Throwable alaError){
+                    prefs.edit().putString("ala_error",shortMsg(alaError)).apply();
+                }
+            }
+
+            if(!anyPending&&!alaPending){
+                setStatus(heartbeatHealthy?"Heartbeat OK · waiting for orders":"Server online · heartbeat retrying");
+            }
+            return (anyPending||alaPending)?ACTIVE_POLL_MS:IDLE_POLL_MS;
         }catch(Throwable e){
             consecutiveErrors++;
             recordPoll(false);
@@ -276,6 +285,104 @@ public class BridgeService extends Service {
         }catch(Throwable e){
             markPrinterFailure(printer,e);
             setStatus("Printer "+printer+" reconnecting · "+shortMsg(e));
+        }
+    }
+
+    private boolean processAlaCarteJobs(String ip1,String ip2,int port)throws Exception{
+        JSONObject response=new JSONObject(alaRequest("GET",null));
+        JSONArray jobs=response.optJSONArray("jobs");
+        if(jobs==null||jobs.length()==0)return false;
+
+        boolean pending=false;
+        for(int i=0;i<jobs.length();i++){
+            JSONObject job=jobs.getJSONObject(i);
+            String jid=job.getString("job_id");
+            String table=job.optString("table_name","table");
+            String localId="ala_"+jid;
+
+            if(!job.optBoolean("printer1_done")){
+                pending=true;
+                processAlaPrinter(jid,localId,1,ip1,port,job,table);
+            }else{
+                clearLocalPrinted(localId,1);
+            }
+
+            if(!job.optBoolean("printer2_done")){
+                pending=true;
+                processAlaPrinter(jid,localId,2,ip2,port,job,table);
+            }else{
+                clearLocalPrinted(localId,2);
+            }
+        }
+        return pending;
+    }
+
+    private void processAlaPrinter(String jobId,String localId,int printer,String ip,int port,JSONObject job,String table){
+        int idx=printer-1;
+        if(System.currentTimeMillis()<printerRetryAt[idx])return;
+        try{
+            if(isLocalPrinted(localId,printer)){
+                setStatus("Confirming PAID "+table+" Printer "+printer+"...");
+                alaAckWithRetry(jobId,printer);
+                clearLocalPrinted(localId,printer);
+                markPrinterSuccess(printer);
+                return;
+            }
+
+            setStatus("Printing PAID "+table+" on Printer "+printer+"...");
+            PrinterClient.printAlaCarteOrder(ip,port,job);
+            markLocalPrinted(localId,printer);
+            alaAckWithRetry(jobId,printer);
+            clearLocalPrinted(localId,printer);
+            markPrinterSuccess(printer);
+            prefs.edit().putLong("last_print_at",System.currentTimeMillis()).apply();
+            setStatus("Printed PAID "+table+" on Printer "+printer);
+        }catch(Throwable e){
+            markPrinterFailure(printer,e);
+            setStatus("PAID Printer "+printer+" reconnecting · "+shortMsg(e));
+        }
+    }
+
+    private void alaAckWithRetry(String jobId,int printer)throws Exception{
+        Exception last=null;
+        for(int attempt=1;attempt<=3;attempt++){
+            try{
+                JSONObject body=new JSONObject().put("job_id",jobId).put("printer",printer);
+                alaRequest("POST",body.toString());
+                return;
+            }catch(Exception e){
+                last=e;
+                try{Thread.sleep(350L*attempt);}
+                catch(InterruptedException ie){Thread.currentThread().interrupt();throw ie;}
+            }
+        }
+        throw last==null?new IOException("Paid order ACK failed"):last;
+    }
+
+    private String alaRequest(String method,String body)throws Exception{
+        HttpURLConnection c=(HttpURLConnection)new URL(BridgeConfig.ALA_API_URL).openConnection();
+        try{
+            c.setConnectTimeout(7000);
+            c.setReadTimeout(10000);
+            c.setRequestMethod(method);
+            c.setUseCaches(false);
+            c.setRequestProperty("Accept","application/json");
+            c.setRequestProperty("Authorization","Bearer "+BuildConfig.ALA_API_KEY);
+            if("POST".equals(method)){
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type","application/json");
+                try(OutputStream o=c.getOutputStream()){
+                    o.write((body==null?"{}":body).getBytes(StandardCharsets.UTF_8));
+                    o.flush();
+                }
+            }
+            int code=c.getResponseCode();
+            InputStream in=code>=200&&code<300?c.getInputStream():c.getErrorStream();
+            String text=read(in);
+            if(code<200||code>=300)throw new IOException("Paid API HTTP "+code+" "+text);
+            return text;
+        }finally{
+            c.disconnect();
         }
     }
 
