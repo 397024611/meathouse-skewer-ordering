@@ -14,6 +14,7 @@ export default function AlaCartePanel({token,context,onRefresh}){
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const pollRef=useRef(null);
+  const requestIdRef=useRef(null);
 
   const menu=context?.menu||[];
   const totalQty=Object.values(cart).reduce((sum,qty)=>sum+(Number(qty)||0),0);
@@ -58,6 +59,7 @@ export default function AlaCartePanel({token,context,onRefresh}){
     if(item.max_per_order!=null&&next>Number(item.max_per_order))return;
     if(delta>0&&totalQty>=Number(context.max_items_per_order||30))return;
     setError('');setNotice('');
+    requestIdRef.current=null;
     setCart(c=>({...c,[item.id]:next}));
   }
 
@@ -69,11 +71,15 @@ export default function AlaCartePanel({token,context,onRefresh}){
       const r=await fetch('/api/customer/ala-carte/checkout',{
         method:'POST',
         headers:{'content-type':'application/json'},
-        body:JSON.stringify({token,items,request_id:makeRequestId()}),
+        body:JSON.stringify({token,items,request_id:(requestIdRef.current||(requestIdRef.current=makeRequestId()))}),
       });
       const j=await r.json();
-      if(!r.ok)throw new Error(j.error||'Unable to start payment.');
+      if(!r.ok){
+        requestIdRef.current=null;
+        throw new Error(j.error||'Unable to start payment.');
+      }
       if(j.paid){
+        requestIdRef.current=null;
         setNotice('This order is already paid.');
         setBusy(false);
         return;
