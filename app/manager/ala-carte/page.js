@@ -49,8 +49,9 @@ export default function AlaCarteManager(){
 
   if(!data)return <main className="page">Loading…</main>;
 
-  const ready=data.db_configured&&data.stripe_configured;
-  const canEnable=ready&&data.release_unlocked;
+  const readyCore=data.db_configured&&data.schema_ready&&data.stripe_configured&&data.bridge_api_configured&&data.release_unlocked;
+  const canEnable=readyCore&&data.stripe_mode==='live';
+  const canTest=readyCore&&data.stripe_mode==='test';
 
   return <main className="page">
     <section className="hero"><h1>A La Carte + Stripe</h1><p>Paid extra skewers after included rounds. Development is isolated from the current ordering flow.</p></section>
@@ -59,9 +60,12 @@ export default function AlaCarteManager(){
     {message&&<div className="notice" style={{marginTop:14}}>{message}</div>}
 
     <div className="grid grid-3" style={{marginTop:16}}>
-      <div className="card"><div className="muted">Database</div><b style={{fontSize:22}}>{data.db_configured?'READY':'NOT CONFIGURED'}</b></div>
-      <div className="card"><div className="muted">Stripe</div><b style={{fontSize:22}}>{data.stripe_configured?'READY':'NOT CONFIGURED'}</b></div>
-      <div className="card"><div className="muted">Release lock</div><b style={{fontSize:22,color:data.release_unlocked?'#28783d':'#9e1b1f'}}>{data.release_unlocked?'UNLOCKED':'LOCKED'}</b></div>
+      <div className="card"><div className="muted">Supabase secret</div><b style={{fontSize:20}}>{data.db_configured?'READY':'MISSING'}</b></div>
+      <div className="card"><div className="muted">A La Carte schema</div><b style={{fontSize:20}}>{data.schema_ready?'READY':'NOT APPLIED'}</b>{data.schema_error&&<div className="muted" style={{fontSize:11,marginTop:5}}>{data.schema_error}</div>}</div>
+      <div className="card"><div className="muted">Stripe</div><b style={{fontSize:20}}>{data.stripe_configured?('READY · '+String(data.stripe_mode).toUpperCase()):'MISSING'}</b><div className="muted" style={{fontSize:11,marginTop:5}}>Secret {data.stripe_secret_configured?'✓':'✕'} · Webhook {data.stripe_webhook_configured?'✓':'✕'}</div></div>
+      <div className="card"><div className="muted">Paid print Bridge key</div><b style={{fontSize:20}}>{data.bridge_api_configured?'READY':'MISSING'}</b></div>
+      <div className="card"><div className="muted">Release lock</div><b style={{fontSize:20,color:data.release_unlocked?'#28783d':'#9e1b1f'}}>{data.release_unlocked?'UNLOCKED':'LOCKED'}</b></div>
+      <div className="card"><div className="muted">Customer release</div><b style={{fontSize:20,color:data.settings.enabled?'#28783d':'#9e1b1f'}}>{data.settings.enabled?'LIVE':'OFF'}</b></div>
     </div>
 
     <div className="card" style={{marginTop:16,border:data.settings.enabled?'2px solid #28783d':'2px solid #c9bfb5'}}>
@@ -76,6 +80,28 @@ export default function AlaCarteManager(){
       {!canEnable&&<div className="notice" style={{marginTop:12,background:'#fff5df',borderColor:'#e2b75c'}}>Safe mode is active. The customer A La Carte flow cannot be opened yet.</div>}
     </div>
 
+    <div className="card" style={{marginTop:16,border:data.settings.test_mode?'2px solid #c89a43':'1px solid #d8d0c7'}}>
+      <div className="actions" style={{alignItems:'center'}}>
+        <div>
+          <h2 style={{margin:0}}>Single-table TEST mode</h2>
+          <div className="muted" style={{fontSize:12,marginTop:4}}>Stripe TEST keys can only be used on one selected table. Other guests remain on the current ordering flow.</div>
+        </div>
+        <span className="spacer"/>
+        <label style={{display:'flex',gap:9,alignItems:'center',fontWeight:900}}>
+          <input type="checkbox" disabled={!canTest} checked={Boolean(data.settings.test_mode)} onChange={e=>setSetting('test_mode',e.target.checked)}/>
+          {data.settings.test_mode?'TEST ON':'TEST OFF'}
+        </label>
+      </div>
+      <div className="field" style={{marginTop:12,maxWidth:360}}>
+        <label>Test table</label>
+        <select disabled={!canTest||!data.settings.test_mode} value={data.settings.test_table_token||''} onChange={e=>setSetting('test_table_token',e.target.value)}>
+          <option value="">Select a table</option>
+          {(data.tables||[]).map(t=><option key={t.id} value={t.token}>{t.name}</option>)}
+        </select>
+      </div>
+      {data.stripe_mode==='test'&&<div className="notice" style={{marginTop:12,background:'#eef6ff',borderColor:'#9bbfe8'}}>TEST Stripe detected. Full-store switch stays locked; only this selected table can be enabled for testing.</div>}
+    </div>
+
     <div className="grid grid-2" style={{marginTop:16}}>
       <div className="card">
         <h2>Ordering rules</h2>
@@ -85,7 +111,7 @@ export default function AlaCarteManager(){
           <div className="field"><label>Max skewers / paid order</label><input type="number" min="1" max="200" value={data.settings.max_items_per_order} onChange={e=>setSetting('max_items_per_order',Number(e.target.value))}/></div>
           <div className="field"><label>Minimum paid order (AUD)</label><input type="number" min="0" step="0.5" value={(Number(data.settings.minimum_order_cents)||0)/100} onChange={e=>setSetting('minimum_order_cents',Math.round(Number(e.target.value)*100))}/></div>
         </div>
-        <button className="btn brand" disabled={saving||!data.db_configured} onClick={saveSettings} style={{marginTop:14}}>SAVE RULES</button>
+        <button className="btn brand" disabled={saving||!data.schema_ready} onClick={saveSettings} style={{marginTop:14}}>SAVE RULES</button>
       </div>
 
       <div className="card">
@@ -108,7 +134,7 @@ export default function AlaCarteManager(){
         </div>
       </div>)}
     </div>
-    <button className="btn brand" disabled={saving||!data.db_configured} onClick={savePrices} style={{marginTop:14}}>SAVE A LA CARTE PRICES</button>
+    <button className="btn brand" disabled={saving||!data.schema_ready} onClick={savePrices} style={{marginTop:14}}>SAVE A LA CARTE PRICES</button>
 
     <div className="section-title"><h3>Recent paid-order history</h3></div>
     <div style={{display:'grid',gap:8}}>
