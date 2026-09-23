@@ -43,12 +43,10 @@ jobs:
           KEYSTORE_B64: ${{ secrets.MEATHOUSE_KEYSTORE_B64 }}
           KEYSTORE_PASSWORD: ${{ secrets.MEATHOUSE_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.MEATHOUSE_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.MEATHOUSE_KEY_PASSWORD }}
         run: |
           test -n "$KEYSTORE_B64" || { echo "MEATHOUSE_KEYSTORE_B64 is missing"; exit 1; }
           test -n "$KEYSTORE_PASSWORD" || { echo "MEATHOUSE_KEYSTORE_PASSWORD is missing"; exit 1; }
           test -n "$KEY_ALIAS" || { echo "MEATHOUSE_KEY_ALIAS is missing"; exit 1; }
-          test -n "$KEY_PASSWORD" || { echo "MEATHOUSE_KEY_PASSWORD is missing"; exit 1; }
 
       - name: Restore release keystore
         if: github.event_name != 'pull_request'
@@ -64,7 +62,7 @@ jobs:
           MEATHOUSE_KEYSTORE_PATH: ${{ runner.temp }}/meathouse-bridge-release.jks
           MEATHOUSE_KEYSTORE_PASSWORD: ${{ secrets.MEATHOUSE_KEYSTORE_PASSWORD }}
           MEATHOUSE_KEY_ALIAS: ${{ secrets.MEATHOUSE_KEY_ALIAS }}
-          MEATHOUSE_KEY_PASSWORD: ${{ secrets.MEATHOUSE_KEY_PASSWORD }}
+          MEATHOUSE_KEY_PASSWORD: ${{ secrets.MEATHOUSE_KEYSTORE_PASSWORD }}
         run: gradle -p android-bridge assembleRelease --stacktrace
 
       - name: Verify signed release certificate
@@ -72,7 +70,7 @@ jobs:
         run: |
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
           "$APKSIGNER" verify --verbose --print-certs android-bridge/app/build/outputs/apk/release/app-release.apk
-          "$APKSIGNER" verify --print-certs android-bridge/app/build/outputs/apk/release/app-release.apk | grep -F "22:e5:6f:10:11:11:9e:bd:29:23:63:ee:bd:29:83:0b:5c:85:a5:a0:42:d7:a9:65:3a:fc:4f:3a:f5:0b:c3:a4"
+          "$APKSIGNER" verify --print-certs android-bridge/app/build/outputs/apk/release/app-release.apk | grep -Fi "22e56f1011119ebd292363eebd29830b5c85a5a042d7a9653afc4f3af50bc3a4"
 
       - uses: actions/upload-artifact@v4
         with:
