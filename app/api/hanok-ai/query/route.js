@@ -1,19 +1,24 @@
 import { generateText } from "ai";
 import { requireHanokHQ } from "@/lib/hanok-ai-auth";
+import { hanokJson, hanokOptions } from "@/lib/hanok-ai-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
+export function OPTIONS() {
+  return hanokOptions();
+}
+
 export async function POST(request) {
   const auth = await requireHanokHQ(request);
-  if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status });
+  if (!auth.ok) return hanokJson({ error: auth.error }, { status: auth.status });
 
   const body = await request.json().catch(() => ({}));
   const question = String(body.question || "").trim();
   const context = body.context;
 
-  if (!question) return Response.json({ error: "question is required" }, { status: 400 });
-  if (!context) return Response.json({ error: "context is required" }, { status: 400 });
+  if (!question) return hanokJson({ error: "question is required" }, { status: 400 });
+  if (!context) return hanokJson({ error: "context is required" }, { status: 400 });
 
   const prompt = [
     "You are Hanok AI, the private operations assistant for Hanok Group.",
@@ -40,9 +45,9 @@ export async function POST(request) {
       },
     });
 
-    return Response.json({ ok: true, answer: result.text, usage: result.usage });
+    return hanokJson({ ok: true, answer: result.text, usage: result.usage });
   } catch (error) {
     console.error("Hanok AI query error", error);
-    return Response.json({ error: "AI query failed" }, { status: 500 });
+    return hanokJson({ error: "AI query failed" }, { status: 500 });
   }
 }
