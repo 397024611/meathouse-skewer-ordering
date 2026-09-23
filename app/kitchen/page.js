@@ -48,7 +48,10 @@ function formatOrderTime(value) {
   }).format(new Date(value));
 }
 
+function money(cents){return '$'+((Number(cents)||0)/100).toFixed(2);}
+
 function OrderCard({ order, onStatus }) {
+  const paid=order.order_type==='ala_carte';
   const nextAction = order.status === 'new'
     ? { label: 'START PREPARING', status: 'preparing', className: 'brand' }
     : order.status === 'preparing'
@@ -56,16 +59,16 @@ function OrderCard({ order, onStatus }) {
       : { label: 'PICKED UP', status: 'picked_up', className: 'secondary' };
 
   return (
-    <div className="card" style={{ marginBottom: 12 }}>
+    <div className="card" style={{ marginBottom: 12, border: paid ? '2px solid #c89a43' : undefined }}>
       <div className="actions" style={{ alignItems: 'flex-start' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 26 }}>{order.table_name}</h2>
           <div className="muted" style={{ fontSize: 12, marginTop: 3 }}>
-            Order #{order.round_no} · {formatOrderTime(order.created_at)}
+            {paid ? 'PAID EXTRA · ONLINE PAYMENT' : ('Order #'+order.round_no)} · {formatOrderTime(order.created_at)}
           </div>
         </div>
         <span className="spacer" />
-        <span className="badge new">#{order.round_no}</span>
+        <span className={paid ? 'badge available' : 'badge new'}>{paid ? ('PAID '+money(order.amount_total_cents)) : ('#'+order.round_no)}</span>
       </div>
 
       <div style={{ marginTop: 12 }}>

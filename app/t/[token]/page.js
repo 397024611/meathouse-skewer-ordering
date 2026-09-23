@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import LuckySkewerReward from './LuckySkewerReward';
+import AlaCartePanel from './AlaCartePanel';
 
 function fmt(ms) {
   const seconds = Math.max(0, Math.floor(ms / 1000));
@@ -24,13 +25,19 @@ export default function Customer() {
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
   const [luckyVoucher, setLuckyVoucher] = useState(null);
+  const [ala, setAla] = useState(null);
   const submittingRef = useRef(false);
 
   async function load() {
-    const r = await fetch(`/api/customer/session?token=${encodeURIComponent(token)}`, { cache: 'no-store' });
+    const [r,ar] = await Promise.all([
+      fetch(`/api/customer/session?token=${encodeURIComponent(token)}`, { cache: 'no-store' }),
+      fetch(`/api/customer/ala-carte/context?token=${encodeURIComponent(token)}`, { cache: 'no-store' }).catch(()=>null),
+    ]);
     const j = await r.json();
     if (!r.ok) { setErr(j.error || 'Unable to load table.'); return; }
-    setData(j); setErr('');
+    let aj=null;
+    try{if(ar)aj=await ar.json();}catch(e){}
+    setData(j); setAla(aj); setErr('');
   }
 
   useEffect(() => {
@@ -49,6 +56,7 @@ export default function Customer() {
   const wait = session ? Math.max(0, new Date(session.skewer_order_available_at).getTime() - now) : 0;
   const remaining = session ? new Date(session.ends_at).getTime() - now : 0;
   const closed = session ? now >= new Date(session.last_order_at).getTime() : false;
+  const alaActive = Boolean(ala?.enabled && ala?.phase === 'ala_carte');
 
   function change(item, delta) {
     const current = cart[item.id] || 0;
@@ -88,7 +96,7 @@ export default function Customer() {
       {success && <div className="notice" style={{background:'#ecf8ef',borderColor:'#8fc69b',fontWeight:900,fontSize:16}}>{success}</div>}
       {data && <>
         <section className="hero"><h1>Unlimited Skewers</h1><div className="actions"><span className="badge new">{data.table.name}</span>{session && <span className="badge new">{session.adults + session.children_8_12 + session.children_4_7 + session.under_4} Guests</span>}<span className="spacer" /><b style={{ fontSize: 28 }}>{session ? fmt(remaining) : '--:--'}</b></div></section>
-        {!session ? <div className="notice" style={{ marginTop: 14 }}><b>Your table is not active yet.</b><br />Please wait for our team to start your dining session.</div> : <>
+        {!session ? <div className="notice" style={{ marginTop: 14 }}><b>Your table is not active yet.</b><br />Please wait for our team to start your dining session.</div> : alaActive ? <AlaCartePanel token={token} context={ala} onRefresh={load} /> : <>
           <div className="grid grid-2" style={{marginTop:14}}>
             <div className="card" style={{background:'#241c18',color:'#fff'}}><div style={{fontSize:12,opacity:.7}}>THIS ROUND</div><div style={{fontSize:28,fontWeight:900,marginTop:4}}>{total} / {limit}</div><div style={{fontSize:12,opacity:.75}}>skewers selected · {diners} diners × {rate}</div></div>
             <div className="card" style={{background:wait>0?'#fff4df':'#edf8ef',borderColor:wait>0?'#e3b55e':'#8fc69b'}}><div style={{fontSize:12,fontWeight:800}}>NEXT ORDER</div><div style={{fontSize:28,fontWeight:900,marginTop:4}}>{closed?'CLOSED':wait>0?fmt(wait):'READY'}</div><div style={{fontSize:12}}>{wait>0?'Please wait before placing the next round.':'You can place an order now.'}</div></div>

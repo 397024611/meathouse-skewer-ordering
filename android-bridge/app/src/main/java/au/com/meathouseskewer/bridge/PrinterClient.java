@@ -51,6 +51,38 @@ final class PrinterClient {
         line(b,"=========================================="); finish(b); send(host,port,b.toByteArray());
     }
 
+    static void printAlaCarteOrder(String host,int port,JSONObject job)throws Exception{
+        ByteArrayOutputStream b=new ByteArrayOutputStream();init(b);center(b);bold(b,true);
+        line(b,"MEAT HOUSE");
+        line(b,"已付款加单 / PAID EXTRA ORDER");
+        line(b,"==========================================");
+        size(b,1,1);line(b,bilingualTable(job.optString("table_name","")));size(b,0,0);
+        line(b,"ONLINE PAYMENT CONFIRMED");
+        line(b,"==========================================");
+
+        left(b);bold(b,false);
+        JSONArray items=job.optJSONArray("items");int total=0;
+        if(items!=null)for(int i=0;i<items.length();i++){
+            JSONObject it=items.getJSONObject(i);
+            int qty=it.optInt("qty",0);total+=qty;
+            String display=it.optString("item_name","Item");
+            String[] names=bilingualNames(display,display);
+            bold(b,true);line(b,formatColumns(names[0],"× "+qty));bold(b,false);
+            if(!names[1].isEmpty())line(b,"  "+names[1]);
+            if(i<items.length()-1)line(b,"");
+        }
+
+        line(b,"------------------------------------------");
+        bold(b,true);
+        line(b,formatColumns("总串数 / TOTAL",String.valueOf(total)));
+        long cents=job.optLong("amount_total_cents",0L);
+        line(b,formatColumns("已付款 / PAID","$"+String.format(java.util.Locale.ROOT,"%.2f",cents/100.0)));
+        bold(b,false);
+        line(b,"==========================================");
+        finish(b);
+        send(host,port,b.toByteArray());
+    }
+
     static long probe(String host,int port){
         long start=System.nanoTime();
         try(Socket s=new Socket()){

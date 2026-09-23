@@ -1,0 +1,29 @@
+name: Build Web App
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: package.json
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Next.js
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://tbpinwmfmywkpdqnpula.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_bW5xqejyr2xhqsnrDhLDNw_O1mJMQzV
+          NEXT_PUBLIC_APP_URL: https://meathouseskewer.com.au
+          ALA_CARTE_RELEASE_UNLOCK: 'false'
+        run: npm run build
