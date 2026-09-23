@@ -8,6 +8,13 @@ on:
       - 'android-bridge/build.gradle'
       - 'android-bridge/settings.gradle'
       - '.github/workflows/build-android-bridge.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'android-bridge/app/**'
+      - 'android-bridge/build.gradle'
+      - 'android-bridge/settings.gradle'
+      - '.github/workflows/build-android-bridge.yml'
   workflow_dispatch:
 
 permissions:
@@ -33,6 +40,7 @@ jobs:
           path: android-bridge/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Publish latest APK to repository and website
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           mkdir -p android-bridge/releases public
           cp android-bridge/app/build/outputs/apk/debug/app-debug.apk android-bridge/releases/MeatHouse-Skewer-Bridge-latest.apk
