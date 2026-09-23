@@ -84,9 +84,21 @@ jobs:
           mkdir -p android-bridge/releases public
           cp android-bridge/app/build/outputs/apk/release/app-release.apk android-bridge/releases/MeatHouse-Skewer-Bridge-latest.apk
           cp android-bridge/app/build/outputs/apk/release/app-release.apk public/bridge.apk
+          VERSION_CODE="$(sed -n "s/.*versionCode[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p" android-bridge/app/build.gradle | head -1)"
+          VERSION_NAME="$(sed -n "s/.*versionName[[:space:]]*'\\([^']*\\)'.*/\\1/p" android-bridge/app/build.gradle | head -1)"
+          APK_SHA256="$(sha256sum public/bridge.apk | awk '{print $1}')"
+          cat > public/bridge-version.json <<EOF
+          {
+            "versionCode": $VERSION_CODE,
+            "versionName": "$VERSION_NAME",
+            "apkUrl": "https://meathouseskewer.com.au/bridge.apk",
+            "sha256": "$APK_SHA256",
+            "notes": "A signed Meat House Bridge update is available."
+          }
+          EOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add android-bridge/releases/MeatHouse-Skewer-Bridge-latest.apk public/bridge.apk
+          git add android-bridge/releases/MeatHouse-Skewer-Bridge-latest.apk public/bridge.apk public/bridge-version.json
           git commit -m "Publish signed Meat House Bridge APK" || exit 0
           git pull --rebase origin main
           git push
