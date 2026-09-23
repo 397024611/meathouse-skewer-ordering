@@ -7,6 +7,8 @@ def releaseStorePassword = System.getenv('MEATHOUSE_KEYSTORE_PASSWORD')
 def releaseKeyAlias = System.getenv('MEATHOUSE_KEY_ALIAS')
 def releaseKeyPassword = System.getenv('MEATHOUSE_KEY_PASSWORD')
 def hasReleaseSigning = [releaseKeystorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].every { it != null && !it.isBlank() }
+def alaApiKey = System.getenv('MEATHOUSE_ALA_API_KEY') ?: ''
+def escapedAlaApiKey = alaApiKey.replace('\\', '\\\\').replace('"', '\\"')
 
 android {
     namespace 'au.com.meathouseskewer.bridge'
@@ -16,8 +18,13 @@ android {
         applicationId 'au.com.meathouseskewer.bridge'
         minSdk 26
         targetSdk 35
-        versionCode 4
-        versionName '2.2.0'
+        versionCode 5
+        versionName '2.3.0'
+        buildConfigField 'String', 'ALA_API_KEY', '"' + escapedAlaApiKey + '"'
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     signingConfigs {
