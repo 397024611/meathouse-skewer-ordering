@@ -76,7 +76,7 @@ public class MainActivity extends Activity {
         start=primaryButton("START BRIDGE");root.addView(start);
         stop=secondaryButton("STOP BRIDGE");LinearLayout.LayoutParams slp=(LinearLayout.LayoutParams)stop.getLayoutParams();slp.setMargins(0,dp(10),0,0);stop.setLayoutParams(slp);root.addView(stop);
 
-        TextView footer=text("v"+BuildConfig.VERSION_NAME+" · ESC/POS · TCP 9100 · two-printer mirrored orders",11,false,Color.GRAY);footer.setGravity(Gravity.CENTER);footer.setPadding(0,dp(18),0,0);root.addView(footer);
+        TextView footer=text("v"+BridgeConfig.APP_VERSION+" · ESC/POS · TCP 9100 · two-printer mirrored orders",11,false,Color.GRAY);footer.setGravity(Gravity.CENTER);footer.setPadding(0,dp(18),0,0);root.addView(footer);
         setContentView(sv);
 
         t1.setOnClickListener(v->test(1));t2.setOnClickListener(v->test(2));tb.setOnClickListener(v->{test(1);test(2);});
