@@ -65,6 +65,7 @@ jobs:
           MEATHOUSE_KEYSTORE_PASSWORD: ${{ secrets.MEATHOUSE_KEYSTORE_PASSWORD }}
           MEATHOUSE_KEY_ALIAS: ${{ secrets.MEATHOUSE_KEY_ALIAS }}
           MEATHOUSE_KEY_PASSWORD: ${{ secrets.MEATHOUSE_KEYSTORE_PASSWORD }}
+          MEATHOUSE_ALA_API_KEY: ${{ secrets.MEATHOUSE_ALA_API_KEY }}
         run: gradle -p android-bridge assembleRelease --stacktrace
 
       - name: Verify signed release certificate
