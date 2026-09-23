@@ -1,8 +1,13 @@
 import { generateText } from "ai";
 import { requireHanokHQ } from "@/lib/hanok-ai-auth";
+import { hanokJson, hanokOptions } from "@/lib/hanok-ai-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+
+export function OPTIONS() {
+  return hanokOptions();
+}
 
 const CATEGORIES = [
   "Maintenance",
@@ -53,12 +58,12 @@ function normalizeResult(value, stores) {
 
 export async function POST(request) {
   const auth = await requireHanokHQ(request);
-  if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status });
+  if (!auth.ok) return hanokJson({ error: auth.error }, { status: auth.status });
 
   const body = await request.json().catch(() => ({}));
   const text = String(body.text || "").trim();
-  if (!text) return Response.json({ error: "text is required" }, { status: 400 });
-  if (text.length > 12000) return Response.json({ error: "Input too large" }, { status: 413 });
+  if (!text) return hanokJson({ error: "text is required" }, { status: 400 });
+  if (text.length > 12000) return hanokJson({ error: "Input too large" }, { status: 413 });
 
   const stores = Array.isArray(body.stores)
     ? body.stores.map(String).filter(Boolean).slice(0, 50)
@@ -109,9 +114,9 @@ export async function POST(request) {
     });
 
     const parsed = normalizeResult(parseJson(result.text), stores);
-    return Response.json({ ok: true, result: parsed, usage: result.usage });
+    return hanokJson({ ok: true, result: parsed, usage: result.usage });
   } catch (error) {
     console.error("Hanok AI analyze error", error);
-    return Response.json({ error: "AI analysis failed" }, { status: 500 });
+    return hanokJson({ error: "AI analysis failed" }, { status: 500 });
   }
 }
