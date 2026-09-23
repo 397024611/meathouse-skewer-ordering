@@ -37,3 +37,8 @@ Independent table-ordering system for Meat House Canberra.
 
 ## Environment
 Copy `.env.example` to `.env.local` and provide the Meat House Supabase publishable key. Never commit private keys or operational PINs.
+
+
+## A La Carte + Stripe
+
+The paid extra-skewer flow is built behind a default-OFF release lock. Setup and safe single-table test instructions are in `docs/ALA-CARTE-STRIPE-SETUP.md`.
