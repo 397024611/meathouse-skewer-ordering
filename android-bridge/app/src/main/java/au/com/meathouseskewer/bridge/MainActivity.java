@@ -17,8 +17,10 @@ import android.widget.*;
 
 public class MainActivity extends Activity {
     private EditText ip1,ip2,port;
-    private TextView statusText,statusPill,backgroundState,serviceHealth,printerHealth;
-    private Button start,stop;
+    private TextView statusText,statusPill,backgroundState,serviceHealth,printerHealth,updateStatus,updateNotes;
+    private Button start,stop,updateButton;
+    private AppUpdater.UpdateInfo pendingUpdate;
+    private boolean updateCheckInFlight=false;
     private final Handler h=new Handler(Looper.getMainLooper());
     private long lastRecoveryAttempt=0L;
     private final int burgundy=Color.rgb(105,32,31),ink=Color.rgb(32,28,26),cream=Color.rgb(248,246,242),line=Color.rgb(225,220,214);
@@ -30,12 +32,14 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},5);
         buildUi();
         h.post(refresh);
+        checkForUpdates(false);
     }
 
     @Override protected void onResume(){
         super.onResume();
         updateBackgroundState();
         maybeRecoverService(true);
+        if(pendingUpdate!=null&&updateButton!=null){updateButton.setEnabled(true);updateButton.setText("UPDATE NOW");}
     }
 
     private void buildUi(){
@@ -73,15 +77,90 @@ public class MainActivity extends Activity {
         TextView bgHelp=text("Uses special-use foreground service, CPU/Wi-Fi locks, watchdog recovery and network reconnect detection. Keep this phone on store Wi-Fi and power.",12,false,Color.DKGRAY);bgHelp.setPadding(0,dp(4),0,dp(8));bg.addView(bgHelp);
         Button allow=secondaryButton("ENABLE ALWAYS-ON PROTECTION");bg.addView(allow);root.addView(bg);
 
+        section(root,"SOFTWARE UPDATE");
+        LinearLayout updater=card();updater.setPadding(dp(16),dp(14),dp(16),dp(14));
+        updateStatus=text("Checking for updates…",14,true,ink);updater.addView(updateStatus);
+        updateNotes=text("Current version · v"+AppUpdater.currentVersionName(this),12,false,Color.DKGRAY);updateNotes.setPadding(0,dp(4),0,dp(8));updater.addView(updateNotes);
+        updateButton=secondaryButton("CHECK FOR UPDATE");updater.addView(updateButton);root.addView(updater);
+
         start=primaryButton("START BRIDGE");root.addView(start);
         stop=secondaryButton("STOP BRIDGE");LinearLayout.LayoutParams slp=(LinearLayout.LayoutParams)stop.getLayoutParams();slp.setMargins(0,dp(10),0,0);stop.setLayoutParams(slp);root.addView(stop);
 
-        TextView footer=text("v"+BridgeConfig.APP_VERSION+" · ESC/POS · TCP 9100 · two-printer mirrored orders",11,false,Color.GRAY);footer.setGravity(Gravity.CENTER);footer.setPadding(0,dp(18),0,0);root.addView(footer);
+        TextView footer=text("v"+AppUpdater.currentVersionName(this)+" · ESC/POS · TCP 9100 · signed auto-update enabled",11,false,Color.GRAY);footer.setGravity(Gravity.CENTER);footer.setPadding(0,dp(18),0,0);root.addView(footer);
         setContentView(sv);
 
         t1.setOnClickListener(v->test(1));t2.setOnClickListener(v->test(2));tb.setOnClickListener(v->{test(1);test(2);});
         start.setOnClickListener(v->startBridge());stop.setOnClickListener(v->stopBridge());allow.setOnClickListener(v->requestBackgroundAccess());
+        updateButton.setOnClickListener(v->{if(pendingUpdate!=null)beginUpdate();else checkForUpdates(true);});
         updateBackgroundState();
+    }
+
+    private void checkForUpdates(boolean manual){
+        if(updateCheckInFlight)return;
+        updateCheckInFlight=true;
+        if(updateStatus!=null)updateStatus.setText(manual?"Checking for updates…":"Automatic update check…");
+        if(updateNotes!=null)updateNotes.setText("Current version · v"+AppUpdater.currentVersionName(this));
+        if(updateButton!=null){updateButton.setEnabled(false);updateButton.setText("CHECKING…");}
+
+        AppUpdater.check(this,new AppUpdater.CheckListener(){
+            @Override public void onUpdateAvailable(AppUpdater.UpdateInfo info){
+                updateCheckInFlight=false;
+                pendingUpdate=info;
+                updateStatus.setText("UPDATE AVAILABLE · v"+info.versionName);
+                updateStatus.setTextColor(Color.rgb(176,105,20));
+                updateNotes.setText(info.notes.isEmpty()?"A newer signed Bridge version is ready.":info.notes);
+                updateButton.setText("UPDATE NOW");
+                updateButton.setEnabled(true);
+            }
+
+            @Override public void onUpToDate(String versionName){
+                updateCheckInFlight=false;
+                pendingUpdate=null;
+                updateStatus.setText("UP TO DATE · v"+versionName);
+                updateStatus.setTextColor(Color.rgb(42,120,72));
+                updateNotes.setText("Automatic update checking is active.");
+                updateButton.setText("CHECK AGAIN");
+                updateButton.setEnabled(true);
+            }
+
+            @Override public void onError(String message){
+                updateCheckInFlight=false;
+                updateStatus.setText("UPDATE CHECK UNAVAILABLE");
+                updateStatus.setTextColor(Color.rgb(176,105,20));
+                updateNotes.setText(message);
+                updateButton.setText("TRY AGAIN");
+                updateButton.setEnabled(true);
+            }
+        });
+    }
+
+    private void beginUpdate(){
+        if(pendingUpdate==null){checkForUpdates(true);return;}
+        updateButton.setEnabled(false);
+        updateButton.setText("PREPARING…");
+        AppUpdater.downloadAndInstall(this,pendingUpdate,new AppUpdater.InstallListener(){
+            @Override public void onStatus(String message){
+                updateStatus.setText(message);
+                updateStatus.setTextColor(ink);
+                updateNotes.setText("Do not uninstall the current app. Android will update it in place.");
+            }
+
+            @Override public void onPermissionRequired(){
+                updateStatus.setText("INSTALL PERMISSION REQUIRED");
+                updateStatus.setTextColor(Color.rgb(176,105,20));
+                updateNotes.setText("Enable 'Allow from this source', return here, then tap UPDATE NOW again.");
+                updateButton.setText("UPDATE NOW");
+                updateButton.setEnabled(true);
+            }
+
+            @Override public void onError(String message){
+                updateStatus.setText("UPDATE FAILED");
+                updateStatus.setTextColor(Color.rgb(176,105,20));
+                updateNotes.setText(message);
+                updateButton.setText("RETRY UPDATE");
+                updateButton.setEnabled(true);
+            }
+        });
     }
 
     private boolean batteryProtectionOk(){
