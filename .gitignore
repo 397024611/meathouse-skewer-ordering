@@ -4,3 +4,9 @@ node_modules
 .env.local
 .vercel
 .DS_Store
+
+# Android signing material — never commit
+*.jks
+*.keystore
+keystore.properties
+android-bridge/signing/
