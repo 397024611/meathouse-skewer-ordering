@@ -2,7 +2,7 @@ import {db} from '@/lib/db';
 import {adminDb,adminDbConfigured} from '@/lib/db-admin';
 import {getAccessToken,requireRole} from '@/lib/auth';
 import {ALA_DEFAULTS,alaCarteReleaseUnlocked,clampInt} from '@/lib/ala-carte';
-import {stripeConfigured} from '@/lib/stripe';
+import {stripeConfigured,stripeMode,stripeSecretConfigured,stripeWebhookConfigured} from '@/lib/stripe';
 
 async function managerMenu(token){
   const {data,error}=await db().rpc('manager_get_menu',{p_secret:token});
@@ -10,20 +10,39 @@ async function managerMenu(token){
   return data||[];
 }
 
+async function managerTables(token){
+  const {data,error}=await db().rpc('manager_tables',{p_secret:token});
+  if(error)throw error;
+  return data||[];
+}
+
+function bridgeApiConfigured(){
+  return Boolean(process.env.MEATHOUSE_ALA_API_KEY);
+}
+
 export async function GET(){
   const role=await requireRole(['manager']);
   if(!role)return Response.json({error:'Manager login required.'},{status:401});
   const token=await getAccessToken();
+
   try{
-    const menu=await managerMenu(token);
+    const [menu,tables]=await Promise.all([managerMenu(token),managerTables(token)]);
     const base={
       db_configured:adminDbConfigured(),
+      schema_ready:false,
+      schema_error:null,
+      stripe_secret_configured:stripeSecretConfigured(),
+      stripe_webhook_configured:stripeWebhookConfigured(),
       stripe_configured:stripeConfigured(),
+      stripe_mode:stripeMode(),
+      bridge_api_configured:bridgeApiConfigured(),
       release_unlocked:alaCarteReleaseUnlocked(),
       settings:{...ALA_DEFAULTS},
       menu:menu.map(item=>({...item,ala_active:false,price_cents:0,max_per_order:null})),
+      tables:tables.filter(t=>t.active).map(t=>({id:t.id,name:t.name,token:t.token})),
       orders:[],
     };
+
     if(!adminDbConfigured())return Response.json(base);
 
     const [settingsRes,pricesRes,ordersRes]=await Promise.all([
@@ -32,11 +51,14 @@ export async function GET(){
       adminDb().from('ala_carte_orders').select('id,table_name,status,kitchen_status,amount_total_cents,currency,created_at,paid_at,stripe_checkout_session_id,ala_carte_order_items(item_name,qty,unit_price_cents,line_total_cents)').order('created_at',{ascending:false}).limit(100),
     ]);
     const error=settingsRes.error||pricesRes.error||ordersRes.error;
-    if(error)throw error;
+    if(error){
+      return Response.json({...base,schema_ready:false,schema_error:error.message||'A La Carte schema is not ready.'});
+    }
 
     const priceMap=new Map((pricesRes.data||[]).map(row=>[String(row.menu_item_id),row]));
     return Response.json({
       ...base,
+      schema_ready:true,
       settings:{...ALA_DEFAULTS,...(settingsRes.data||{})},
       menu:menu.map(item=>{
         const p=priceMap.get(String(item.id));
@@ -56,15 +78,37 @@ export async function POST(request){
 
   const token=await getAccessToken();
   const body=await request.json().catch(()=>({}));
+
   try{
     if(body.action==='settings'){
       const enabled=Boolean(body.enabled);
-      if(enabled&&(!alaCarteReleaseUnlocked()||!stripeConfigured())){
-        return Response.json({error:'A La Carte is development-locked or Stripe is not fully configured.'},{status:409});
+      const testMode=Boolean(body.test_mode);
+      const mode=stripeMode();
+
+      if((enabled||testMode)&&(!alaCarteReleaseUnlocked()||!stripeConfigured()||!bridgeApiConfigured())){
+        return Response.json({error:'A La Carte is still locked or Stripe / paid-order printing is not fully configured.'},{status:409});
       }
+
+      if(enabled&&mode!=='live'){
+        return Response.json({error:'Full-store A La Carte can only be enabled with a LIVE Stripe secret key.'},{status:409});
+      }
+
+      if(testMode&&mode!=='test'){
+        return Response.json({error:'Single-table test mode requires a Stripe TEST secret key.'},{status:409});
+      }
+
+      const tables=await managerTables(token);
+      const activeTokens=new Set(tables.filter(t=>t.active).map(t=>String(t.token)));
+      const testTableToken=testMode?String(body.test_table_token||'').trim():null;
+      if(testMode&&!activeTokens.has(testTableToken)){
+        return Response.json({error:'Choose an active table for test mode.'},{status:409});
+      }
+
       const payload={
         id:1,
         enabled,
+        test_mode:testMode,
+        test_table_token:testTableToken||null,
         free_rounds:clampInt(body.free_rounds,0,10,1),
         cooldown_minutes:clampInt(body.cooldown_minutes,0,60,0),
         max_items_per_order:clampInt(body.max_items_per_order,1,200,30),
@@ -72,6 +116,7 @@ export async function POST(request){
         currency:'aud',
         updated_at:new Date().toISOString(),
       };
+
       const {data,error}=await adminDb().from('ala_carte_settings').upsert(payload,{onConflict:'id'}).select('*').single();
       if(error)throw error;
       return Response.json(data);
@@ -94,6 +139,7 @@ export async function POST(request){
           updated_at:new Date().toISOString(),
         };
       });
+
       if(rows.length){
         const {error}=await adminDb().from('ala_carte_prices').upsert(rows,{onConflict:'menu_item_id'});
         if(error)throw error;
