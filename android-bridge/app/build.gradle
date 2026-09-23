@@ -16,8 +16,8 @@ android {
         applicationId 'au.com.meathouseskewer.bridge'
         minSdk 26
         targetSdk 35
-        versionCode 3
-        versionName '2.1.0'
+        versionCode 4
+        versionName '2.2.0'
     }
 
     signingConfigs {
@@ -48,4 +48,9 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+
+dependencies {
+    implementation 'androidx.core:core:1.15.0'
 }
