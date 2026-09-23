@@ -20,6 +20,8 @@ jobs:
           cache-dependency-path: package.json
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Verify A La Carte safety
+        run: npm run verify:ala
       - name: Build Next.js
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://tbpinwmfmywkpdqnpula.supabase.co
