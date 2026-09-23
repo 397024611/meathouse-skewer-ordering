@@ -1,16 +1,21 @@
 import { generateText } from "ai";
 import { requireHanokHQ } from "@/lib/hanok-ai-auth";
+import { hanokJson, hanokOptions } from "@/lib/hanok-ai-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
+export function OPTIONS() {
+  return hanokOptions();
+}
+
 export async function POST(request) {
   const auth = await requireHanokHQ(request);
-  if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status });
+  if (!auth.ok) return hanokJson({ error: auth.error }, { status: auth.status });
 
   const body = await request.json().catch(() => ({}));
   const context = body.context;
-  if (!context) return Response.json({ error: "context is required" }, { status: 400 });
+  if (!context) return hanokJson({ error: "context is required" }, { status: 400 });
 
   const prompt = [
     "You are Hanok AI, acting as an operations chief-of-staff for the owner of a restaurant group.",
@@ -36,9 +41,9 @@ export async function POST(request) {
       },
     });
 
-    return Response.json({ ok: true, brief: result.text, usage: result.usage });
+    return hanokJson({ ok: true, brief: result.text, usage: result.usage });
   } catch (error) {
     console.error("Hanok AI brief error", error);
-    return Response.json({ error: "AI brief failed" }, { status: 500 });
+    return hanokJson({ error: "AI brief failed" }, { status: 500 });
   }
 }
