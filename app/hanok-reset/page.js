@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-const SB_URL = "https://lludyxgivnmmkovhhrgg.supabase.co";
-const SB_KEY = "sb_publishable_YCeXPfqOdVS84ZRis-miEg_v7W0s3Dg";
+const SB_URL = "https://tqfwbsjchespjkxliodo.supabase.co";
+const SB_KEY = "sb_publishable_gzlaNquJPCOsgVMb1ZhRdw_X38GSi6s";
 
 function parseRecovery() {
   if (typeof window === "undefined") return {};
