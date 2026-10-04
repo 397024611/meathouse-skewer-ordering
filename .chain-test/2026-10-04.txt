@@ -1,0 +1,3 @@
+Connectivity test marker for GitHub -> Vercel -> Supabase chain.
+Created 2026-10-04 (Australia/Sydney).
+No application runtime behavior is changed by this file.
